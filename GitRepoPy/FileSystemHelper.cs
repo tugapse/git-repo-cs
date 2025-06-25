@@ -148,5 +148,7 @@ namespace GitRepoPy
             // If we reach here, all retries failed
             Logger.LogError($"Failed to delete directory '{path}' after {maxRetries} attempts. Manual removal may be required. Please check for processes holding locks on files within this directory or verify permissions.", 1);
         }
+
+        // Removed ConvertWindowsPathToUnixPath as it's no longer needed.
     }
 }
