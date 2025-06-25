@@ -1,0 +1,14 @@
+/home/fabio/Code/git-repo-cs/bin/Debug/net8.0/git-repo
+/home/fabio/Code/git-repo-cs/bin/Debug/net8.0/git-repo.deps.json
+/home/fabio/Code/git-repo-cs/bin/Debug/net8.0/git-repo.runtimeconfig.json
+/home/fabio/Code/git-repo-cs/bin/Debug/net8.0/git-repo.dll
+/home/fabio/Code/git-repo-cs/bin/Debug/net8.0/git-repo.pdb
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.GeneratedMSBuildEditorConfig.editorconfig
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.AssemblyInfoInputs.cache
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.AssemblyInfo.cs
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.csproj.CoreCompileInputs.cache
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.dll
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/refint/git-repo.dll
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.pdb
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/git-repo.genruntimeconfig.cache
+/home/fabio/Code/git-repo-cs/obj/Debug/net8.0/ref/git-repo.dll
