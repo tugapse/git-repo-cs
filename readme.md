@@ -27,7 +27,7 @@ Setting up new Python projects from Git repositories often involves repetitive t
 - **Setup Mode**:  
   - Clones a Git repository to a designated directory.  
   - Creates a Python virtual environment.  
-  - Installs dependencies from `requirements.txt` or executes `build.sh`.  
+  - Installs dependencies from `requirements.txt`.  
   - Generates a wrapper script for execution (`run.sh` or `main.py`).  
 
 - **Removal Mode**:  
