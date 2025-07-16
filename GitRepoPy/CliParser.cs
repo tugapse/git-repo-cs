@@ -48,8 +48,8 @@ namespace GitRepoPy
 
             if (args.Length == 0)
             {
-                return parsed;
                 Logger.LogError("No arguments provided. Use --help for usage.", 1);
+                return parsed;
             }
 
             for (int i = 0; i < args.Length; i++)
