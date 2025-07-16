@@ -11,7 +11,7 @@ namespace GitRepoPy
     /// </summary>
     public static class GlobalConfig
     {
-        public const string SCRIPT_VERSION = "2.0.0";
+        public const string SCRIPT_VERSION = "2.0.1";
 
         // Base directory for cloned repositories
         // Falls back to /usr/local/tools on Unix-like.
