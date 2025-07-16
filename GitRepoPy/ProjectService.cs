@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
-using GitRepoPy; // For other helper classes
 
 namespace GitRepoPy
 {
@@ -181,7 +175,6 @@ namespace GitRepoPy
             {
                 foreach (var dir in Directory.EnumerateDirectories(projectDir, "__pycache__", SearchOption.AllDirectories))
                 {
-                    Logger.LogInfo($"Deleting: {dir}");
                     FileSystemHelper.DeleteDirectoryRobustly(dir, true); // Use robust deletion for pycache too
                 }
                 Logger.LogInfo("'__pycache__' directories cleaned.");
@@ -240,7 +233,7 @@ namespace GitRepoPy
                 }
                 else
                 {
-                Logger.LogInfo("Stashed changes popped successfully.");
+                    Logger.LogInfo("Stashed changes popped successfully.");
                 }
             }
 
@@ -464,27 +457,6 @@ namespace GitRepoPy
                 cmdWrapperContent.AppendLine(")");
                 cmdWrapperContent.AppendLine("");
 
-                if (isProjectRunShUsed)
-                {
-                    // If the project has its own run.sh, we still need bash.exe to execute it.
-                    // The previous path conversion logic in FileSystemHelper is gone, so we must rely on bash's internal path handling or the user's PATH.
-                    // This creates a circular dependency or reintroduces complexity.
-                    // Therefore, for simplicity and eliminating bash.exe dependency,
-                    // if a run.sh exists, we'll stick to generating a main.py wrapper as well (forceCreateRunMode behavior).
-                    // Or, we explicitly state that 'run.sh' on Windows *must* be a batch file.
-                    // Given the request to remove bash, the simplest is to always generate a Python call.
-                    // Reverting strategy: If run.sh exists and it's Windows, we will NOT use it.
-                    // The primary goal is removing bash.
-                    // Let's modify the condition and log message to reflect this.
-                    // The logic here is already inside the 'isProjectRunShUsed' block, implying we FOUND a run.sh.
-                    // If we want to strictly remove bash, then we can't symlink to a .sh file for windows.
-                    // The only path here for Windows should be to generate the Python call directly.
-                    // Let's update the if/else to reflect this.
-                    Logger.LogWarn($"Detected 'run.sh' in project for Windows, but for cross-platform compatibility without bash.exe, will generate a '.cmd' wrapper that executes 'main.py'.");
-                    scriptToExecutePath = localProjectMainPyPath; // Override to main.py
-                    // Continue with the Python execution below.
-                }
-
                 // Check if main.py exists and execute it
                 cmdWrapperContent.AppendLine($"set \"MAIN_PYTHON_SCRIPT=%PROJECT_ROOT%\\main.py\"");
                 cmdWrapperContent.AppendLine("if not exist \"%MAIN_PYTHON_SCRIPT%\" (");
@@ -608,6 +580,66 @@ namespace GitRepoPy
             PathEnvironmentManager.AddToolsBinToSystemPath();
 
             Logger.LogInfo($"Project setup for '{repoName}' completed successfully!");
+        }
+
+        public static void ListProjects()
+        {
+            string lineSpacer = "".PadRight(30, "-".ToArray()[0]);
+            int projectCount = 0;
+
+            Logger.LogInfo(lineSpacer);
+            Logger.LogInfo("Managed Projects:", GlobalConfig.CYAN);
+            Logger.LogInfo(lineSpacer);
+
+
+            foreach (string filename in Directory.GetFiles(GlobalConfig.TOOLS_BIN_DIR))
+            {
+                string projetcRoot = GetProjectRootFromFile(filename);
+                if (string.IsNullOrEmpty(projetcRoot) || !Directory.Exists(Path.Combine(projetcRoot, ".git")))
+                {
+                    Logger.LogWarn($"Not found {filename}");
+                    continue;
+                }
+                string projectName = Path.GetDirectoryName(projetcRoot);
+                string venvStatus = Directory.Exists(Path.Combine(projetcRoot, ".venv")) ? "OK" : "N/A";
+                DateTime createdAt = Directory.GetCreationTimeUtc(projetcRoot);
+                Logger.LogInfo($"# {projectName}", GlobalConfig.BLUE);
+                Logger.LogInfo($"  Path:{projetcRoot}");
+                Logger.LogInfo($"  Venv:{venvStatus}");
+                Logger.LogInfo($"  Created At:{createdAt}");
+                Logger.LogInfo(lineSpacer, GlobalConfig.CYAN);
+                projectCount++;
+            }
+            if (projectCount == 0)
+            {
+                Logger.LogInfo("No managed projects found.", GlobalConfig.WARN_COLOR);
+                Logger.LogInfo(lineSpacer, GlobalConfig.CYAN);
+            }
+            else
+            {
+                Logger.LogInfo($"Total projects found: {projectCount}", GlobalConfig.INFO_COLOR);
+                Logger.LogInfo(lineSpacer, GlobalConfig.CYAN);
+            }
+            Environment.Exit(0);
+
+        }
+
+        private static string GetProjectRootFromFile(string filename)
+        {
+            string[] fileLines = File.ReadAllLines(filename);
+            string found = String.Empty;
+            foreach (string textLine in fileLines)
+            {
+
+                if (textLine.Contains("PROJECT_ROOT"))
+                {
+                    found = textLine.Split("=")[1];
+                    found = found.Replace("\"", "");
+                    break;
+                }
+            }
+
+            return found;
         }
     }
 }

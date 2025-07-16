@@ -16,11 +16,15 @@ namespace GitRepoPy
 
         /// <summary>Logs an informational message to the console.</summary>
         /// <param name="message">The message to log.</param>
-        public static void LogInfo(string message) => Console.WriteLine($"{GlobalConfig.INFO_COLOR}[INFO] {DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{GlobalConfig.RESET_COLOR}");
+        public static void LogInfo(string message, string color = "" ) => Console.WriteLine($"{color}[INFO] {DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{GlobalConfig.RESET_COLOR}");
 
         /// <summary>Logs a warning message to the console (to standard error stream).</summary>
         /// <param name="message">The message to log.</param>
-        public static void LogWarn(string message) => Console.Error.WriteLine($"{GlobalConfig.WARN_COLOR}[WARN] {DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{GlobalConfig.RESET_COLOR}");
+        public static void LogWarn(string message)
+        {
+            if (Program.Verbose)
+                Console.Error.WriteLine($"{GlobalConfig.WARN_COLOR}[WARN] {DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{GlobalConfig.RESET_COLOR}");
+        }
 
         /// <summary>Logs an error message to the console (to standard error stream) and exits the application.</summary>
         /// <param name="message">The error message to log.</param>

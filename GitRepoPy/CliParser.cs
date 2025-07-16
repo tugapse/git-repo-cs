@@ -14,7 +14,8 @@ namespace GitRepoPy
         BuildPythonRun, // Legacy mode, now falls into Setup with specific force-run behavior
         ForceCreateRun,
         Update,
-        Help
+        Help,
+        List
     }
 
     /// <summary>
@@ -25,6 +26,7 @@ namespace GitRepoPy
         public ScriptMode Mode { get; set; }
         public string RepoName { get; set; }
         public string GitHubUrl { get; set; }
+        public bool Verbose { get; set; }
     }
 
     /// <summary>
@@ -43,6 +45,7 @@ namespace GitRepoPy
 
             if (args.Length == 0)
             {
+                return parsed;
                 Logger.LogError("No arguments provided. Use --help for usage.", 1);
             }
 
@@ -54,6 +57,14 @@ namespace GitRepoPy
                 {
                     switch (arg)
                     {
+                        case "--verbose":
+                        case "-v":
+                            parsed.Verbose = true;
+                            break;
+                        case "--list":
+                        case "-l":
+                            parsed.Mode = ScriptMode.List;
+                            return parsed;
                         case "--remove":
                         case "-r":
                             parsed.Mode = ScriptMode.Remove;

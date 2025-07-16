@@ -11,6 +11,9 @@ using GitRepoPy;
 /// </summary>
 public class Program
 {
+
+    public static bool Verbose { get; private set; }
+
     public static async Task Main(string[] args)
     {
         // Logger's static constructor handles console initialization for colors
@@ -18,12 +21,16 @@ public class Program
 
         // Parse command-line arguments
         var parsedArgs = CliParser.Parse(args);
-
+        Verbose = parsedArgs.Verbose;
+        
         // Execute logic based on the determined script mode
         switch (parsedArgs.Mode)
         {
             case ScriptMode.Help:
                 CliParser.DisplayHelp(); // Exits internally after display
+                break;
+            case ScriptMode.List:
+                ProjectService.ListProjects();
                 break;
             case ScriptMode.Remove:
                 ProjectService.RemoveProject(parsedArgs.RepoName); // Exits internally after completion

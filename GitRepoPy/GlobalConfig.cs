@@ -11,7 +11,7 @@ namespace GitRepoPy
     /// </summary>
     public static class GlobalConfig
     {
-        public const string SCRIPT_VERSION = "1.9.0";
+        public const string SCRIPT_VERSION = "2.0.0";
 
         // Base directory for cloned repositories
         // Falls back to /usr/local/tools on Unix-like.
@@ -29,7 +29,14 @@ namespace GitRepoPy
         public const string INFO_COLOR = "\x1b[32m";  // Green
         public const string WARN_COLOR = "\x1b[33m";  // Yellow
         public const string ERROR_COLOR = "\x1b[31m"; // Red
+        public const string MAGENTA = "\x1b[35m"; // Purple
+        public const string BLUE = "\x1b[34m";
+        public const string CYAN = "\x1b[36m";   // Teal or Cyan
+        public const string WHITE = "\x1b[37m";  // White (Light Gray)
+        public const string LIGHT_GRAY = "\x1b[90m";// Light Gray
         public const string RESET_COLOR = "\x1b[0m"; // Reset to default
+
+
 
         // --- P/Invoke for Windows Console Color Support ---
         // Required to enable ANSI escape sequences on Windows 10+ command prompt
