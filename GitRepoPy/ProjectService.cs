@@ -248,7 +248,7 @@ namespace GitRepoPy
         /// <param name="githubUrl">The GitHub URL of the repository.</param>
         /// <param name="forceCreateRunMode">If true, always creates a default Python wrapper script,
         ///                                   even if a 'run.sh' exists in the project.</param>
-        public static async Task SetupProject(string repoName, string githubUrl, bool forceCreateRunMode)
+        public static async Task SetupProject(string repoName, string githubUrl, bool forceCreateRunMode, string branch = "")
         {
             Logger.LogInfo($"Starting project setup script (Version: {GlobalConfig.SCRIPT_VERSION})...");
 
@@ -257,7 +257,6 @@ namespace GitRepoPy
             var projectDir = Path.Combine(GlobalConfig.TOOLS_BASE_DIR, repoName);
             var venvDir = Path.Combine(projectDir, ".venv");
             var requirementsFile = Path.Combine(projectDir, "requirements.txt");
-            var buildScript = Path.Combine(projectDir, "build.sh");
 
             Logger.LogInfo($"Ensuring base directory '{GlobalConfig.TOOLS_BASE_DIR}' exists...");
             try
@@ -289,8 +288,9 @@ namespace GitRepoPy
                     { "GIT_SSH_COMMAND", null }      // Unset custom SSH command
                     // PATH is automatically inherited and not explicitly added here, relying on default behavior of ProcessStartInfo
                 };
+                string _b = branch.Length > 0 ? $"-b \"{branch}\"" : "";
 
-                var (gitCloneExitCode, gitCloneOut, gitCloneErr) = await CommandExecutor.RunCommandAsync("git", $"clone \"{githubUrl}\" \"{projectDir}\"", Environment.CurrentDirectory, environmentVariables: gitCloneEnv);
+                var (gitCloneExitCode, gitCloneOut, gitCloneErr) = await CommandExecutor.RunCommandAsync("git", $"clone {_b} \"{githubUrl}\" \"{projectDir}\"", Environment.CurrentDirectory, environmentVariables: gitCloneEnv);
                 if (gitCloneExitCode != 0)
                 {
                     Logger.LogError($"Failed to clone repository '{githubUrl}': {gitCloneErr}. Check network access and URL.", 1);
@@ -334,21 +334,9 @@ namespace GitRepoPy
                 }
             }
 
-            if (File.Exists(buildScript))
+            if (File.Exists(requirementsFile))
             {
-                Logger.LogInfo($"Found '{buildScript}' for '{repoName}'. Running build script instead of installing from requirements.txt...");
-                FileSystemHelper.SetExecutablePermissions(buildScript); // Make build.sh executable
-
-                var (buildExitCode, buildOut, buildErr) = await CommandExecutor.RunCommandAsync(buildScript, "", projectDir);
-                if (buildExitCode != 0)
-                {
-                    Logger.LogError($"Build script '{buildScript}' failed for '{repoName}': {buildErr}. Check its output for details.", 1);
-                }
-                Logger.LogInfo($"Build script '{buildScript}' executed successfully.");
-            }
-            else if (File.Exists(requirementsFile))
-            {
-                Logger.LogInfo($"No 'build.sh' found. Installing dependencies for '{repoName}' from '{requirementsFile}'...");
+                Logger.LogInfo($"Installing dependencies for '{repoName}' from '{requirementsFile}'...");
                 // Direct path to pip within the virtual environment
                 var pipExecutable = Path.Combine(venvBinDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "pip.exe" : "pip");
 
@@ -361,7 +349,7 @@ namespace GitRepoPy
                 var (pipExitCode, pipOut, pipErr) = await CommandExecutor.RunCommandAsync(pipExecutable, $"install -r \"{requirementsFile}\" --no-input --disable-pip-version-check", projectDir);
                 if (pipExitCode != 0)
                 {
-                    Logger.LogError($"Failed to install dependencies for '{repoName}': {pipErr}. Check '{requirementsFile}' and log for detailed pip errors.", 1);
+                    Logger.LogWarn($"Failed to install dependencies for '{repoName}': {pipErr}. Check '{requirementsFile}' and log for detailed pip errors.");
                 }
                 Logger.LogInfo($"Dependencies for '{repoName}' installed.");
             }

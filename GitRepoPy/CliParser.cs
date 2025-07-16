@@ -23,10 +23,13 @@ namespace GitRepoPy
     /// </summary>
     public struct ParsedArgs
     {
+        public ParsedArgs(){}
+
         public ScriptMode Mode { get; set; }
-        public string RepoName { get; set; }
-        public string GitHubUrl { get; set; }
         public bool Verbose { get; set; }
+        public string RepoName { get; set; } = "";
+        public string GitHubUrl { get; set; } = "";
+        public string Branch { get; set; } = "";
     }
 
     /// <summary>
@@ -65,6 +68,11 @@ namespace GitRepoPy
                         case "-l":
                             parsed.Mode = ScriptMode.List;
                             return parsed;
+                        case "--branch":
+                        case "-b":
+                            if (++i < args.Length) parsed.Branch = args[i];
+                            break;
+
                         case "--remove":
                         case "-r":
                             parsed.Mode = ScriptMode.Remove;
@@ -116,7 +124,7 @@ namespace GitRepoPy
                     }
                     else
                     {
-                         Logger.LogWarn($"Unexpected positional argument '{arg}' after an option. Ignoring.");
+                        Logger.LogWarn($"Unexpected positional argument '{arg}' after an option. Ignoring.");
                     }
                 }
             }

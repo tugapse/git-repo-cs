@@ -42,7 +42,7 @@ public class Program
             case ScriptMode.BuildPythonRun:
             case ScriptMode.ForceCreateRun:
                 // All setup-like modes funnel into this internal method
-                await ProjectService.SetupProject(parsedArgs.RepoName, parsedArgs.GitHubUrl, parsedArgs.Mode == ScriptMode.ForceCreateRun);
+                await ProjectService.SetupProject(parsedArgs.RepoName, parsedArgs.GitHubUrl, parsedArgs.Mode == ScriptMode.ForceCreateRun, parsedArgs.Branch);
                 break;
             default:
                 Logger.LogError("Invalid script mode detected.", 1);
