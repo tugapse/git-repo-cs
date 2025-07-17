@@ -254,9 +254,124 @@ namespace GitRepoPy
 
             await CheckSystemDependencies();
 
-            var projectDir = Path.Combine(GlobalConfig.TOOLS_BASE_DIR, repoName);
-            var venvDir = Path.Combine(projectDir, ".venv");
-            var requirementsFile = Path.Combine(projectDir, "requirements.txt");
+            string projectDir = Path.Combine(GlobalConfig.TOOLS_BASE_DIR, repoName);
+            string venvDir = Path.Combine(projectDir, ".venv");
+            string requirementsFile = Path.Combine(projectDir, "requirements.txt");
+            string localProjectRunScriptPath = Path.Combine(projectDir, "run.sh");
+            string localProjectMainPyPath = Path.Combine(projectDir, "main.py");
+            string venvBinDir = Path.Combine(venvDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Scripts" : "bin");
+
+            EnsureDirectories();
+
+            Logger.LogInfo($"Checking repository '{repoName}' at '{projectDir}'...");
+            if (Directory.Exists(projectDir))
+            {
+                Logger.LogWarn($"Repository '{repoName}' already exists at '{projectDir}'. Skipping cloning.");
+            }
+            else
+            {
+                Logger.LogInfo($"Cloning '{githubUrl}' to '{projectDir}'...");
+
+                await ExecuteGitClone(repoName, githubUrl, branch, projectDir);
+            }
+
+            await SetupEnvironment(repoName, projectDir, venvDir,venvBinDir);
+            await InstallDependencies(repoName, projectDir, requirementsFile, venvBinDir);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                await CreateWindowsExecutable(repoName, projectDir);
+            }
+            else // Linux/macOS (unchanged)
+            {
+                await CreateLinuxExecutable(repoName, forceCreateRunMode, projectDir, localProjectRunScriptPath, localProjectMainPyPath);
+            }
+
+            PathEnvironmentManager.AddToolsBinToSystemPath();
+
+            Logger.LogInfo($"Project setup for '{repoName}' completed successfully!", GlobalConfig.GREEN);
+        }
+
+        private static async Task CreateLinuxExecutable(string repoName, bool forceCreateRunMode, string projectDir, string localProjectRunScriptPath, string localProjectMainPyPath)
+        {
+            var targetBinExecutable = Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName); // No extension for Unix-like
+                                                                                          // Clean up any conflicting files/symlinks first
+            if (File.Exists(targetBinExecutable)) File.Delete(targetBinExecutable);
+            if (File.Exists(targetBinExecutable + ".sh")) File.Delete(targetBinExecutable + ".sh"); // Clean up old .sh if it somehow exists
+
+            if (File.Exists(localProjectRunScriptPath) && !forceCreateRunMode)
+            {
+                // Scenario 1 (Unix-like): project_dir/run.sh found AND --force-create-run is NOT active
+                Logger.LogInfo($"'run.sh' found in project directory ('{localProjectRunScriptPath}'). Making it executable and creating a symbolic link.");
+                FileSystemHelper.SetExecutablePermissions(localProjectRunScriptPath);
+
+                FileSystemHelper.CreateSymlink(localProjectRunScriptPath, targetBinExecutable);
+            }
+            else
+            {
+                // Scenario 2 (Unix-like): project_dir/run.sh NOT found OR --force-create-run IS active
+                if (forceCreateRunMode)
+                {
+                    Logger.LogInfo($"Force-creating default Python wrapper script at '{targetBinExecutable}' (ignoring existing project 'run.sh' if any).");
+                }
+                else
+                {
+                    Logger.LogWarn($"No 'run.sh' found in project directory ('{localProjectRunScriptPath}'). Generating default Python wrapper script directly at '{targetBinExecutable}'.");
+                }
+
+                StringBuilder shScriptContent = ScriptContentBuilder.CreateShScriptContent(projectDir, localProjectMainPyPath);
+
+                try
+                {
+                    await File.WriteAllTextAsync(targetBinExecutable, shScriptContent.ToString());
+                    Logger.LogInfo($"Wrapper script created at '{targetBinExecutable}'.");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to create wrapper script at '{targetBinExecutable}': {ex.Message}. Please check permissions.", 1);
+                }
+
+                FileSystemHelper.SetExecutablePermissions(targetBinExecutable); // Make the file executable
+            }
+            Logger.LogInfo($"Wrapper script for '{repoName}' created successfully at '{targetBinExecutable}'.");
+        }
+
+        private static async Task CreateWindowsExecutable(string repoName, string projectDir)
+        {
+            var targetCmdWrapperPath = Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".cmd");
+
+            // Clean up any conflicting files/symlinks first
+            if (File.Exists(targetCmdWrapperPath)) File.Delete(targetCmdWrapperPath);
+            // Also clean up old .sh files or non-extension links from previous versions
+            if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".sh"))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".sh"));
+            if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName));
+            if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".exe"))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".exe"));
+            StringBuilder cmdWrapperContent = ScriptContentBuilder.CreateCmdScriptContent(projectDir);
+
+            try
+            {
+                await File.WriteAllTextAsync(targetCmdWrapperPath, cmdWrapperContent.ToString());
+                Logger.LogInfo($"CMD wrapper script created at '{targetCmdWrapperPath}'.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to create CMD wrapper script at '{targetCmdWrapperPath}': {ex.Message}. Please check permissions.", 1);
+            }
+            Logger.LogInfo($"Wrapper script for '{repoName}' created successfully at '{targetCmdWrapperPath}'.");
+        }
+
+        private static void EnsureDirectories()
+        {
+            Logger.LogInfo($"Ensuring target bin directory '{GlobalConfig.TOOLS_BIN_DIR}' exists...");
+            try
+            {
+                Directory.CreateDirectory(GlobalConfig.TOOLS_BIN_DIR);
+                Logger.LogInfo($"Target bin directory '{GlobalConfig.TOOLS_BIN_DIR}' created or already exists.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to create target bin directory '{GlobalConfig.TOOLS_BIN_DIR}': {ex.Message}. Please check permissions.", 1);
+            }
 
             Logger.LogInfo($"Ensuring base directory '{GlobalConfig.TOOLS_BASE_DIR}' exists...");
             try
@@ -268,36 +383,10 @@ namespace GitRepoPy
             {
                 Logger.LogError($"Failed to create base directory '{GlobalConfig.TOOLS_BASE_DIR}': {ex.Message}. Please check permissions.", 1);
             }
+        }
 
-            Logger.LogInfo($"Checking repository '{repoName}' at '{projectDir}'...");
-            if (Directory.Exists(projectDir))
-            {
-                Logger.LogWarn($"Repository '{repoName}' already exists at '{projectDir}'. Skipping cloning.");
-            }
-            else
-            {
-                Logger.LogInfo($"Cloning '{githubUrl}' to '{projectDir}'...");
-
-                // Mimic bash script's `env -i ... git clone` for cleaner environment
-                var gitCloneEnv = new Dictionary<string, string?>
-                {
-                    { "HOME", Path.GetTempPath() }, // Use system temp path
-                    { "GIT_ASKPASS", "" },
-                    { "GIT_TERMINAL_PROMPT", "0" },
-                    { "GITHUB_TOKEN", null },        // Unset sensitive token
-                    { "GIT_SSH_COMMAND", null }      // Unset custom SSH command
-                    // PATH is automatically inherited and not explicitly added here, relying on default behavior of ProcessStartInfo
-                };
-                string _b = branch.Length > 0 ? $"-b \"{branch}\"" : "";
-
-                var (gitCloneExitCode, gitCloneOut, gitCloneErr) = await CommandExecutor.RunCommandAsync("git", $"clone {_b} \"{githubUrl}\" \"{projectDir}\"", Environment.CurrentDirectory, environmentVariables: gitCloneEnv);
-                if (gitCloneExitCode != 0)
-                {
-                    Logger.LogError($"Failed to clone repository '{githubUrl}': {gitCloneErr}. Check network access and URL.", 1);
-                }
-                Logger.LogInfo($"Repository '{repoName}' cloned successfully.");
-            }
-
+        private static async Task SetupEnvironment(string repoName, string projectDir, string venvDir,string venvBinDir)
+        {
             Logger.LogInfo($"Setting up virtual environment for '{repoName}' at '{venvDir}'...");
             if (Directory.Exists(venvDir))
             {
@@ -312,9 +401,7 @@ namespace GitRepoPy
                 }
                 Logger.LogInfo($"Virtual environment for '{repoName}' created.");
             }
-
             // Determine correct venv bin directory (Scripts on Windows, bin on Unix-like)
-            var venvBinDir = Path.Combine(venvDir, RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Scripts" : "bin");
             if (Directory.Exists(venvBinDir))
             {
                 Logger.LogInfo($"Making virtual environment executables in '{venvBinDir}' group-executable (if applicable)...");
@@ -334,6 +421,32 @@ namespace GitRepoPy
                 }
             }
 
+        }
+
+        private static async Task ExecuteGitClone(string repoName, string githubUrl, string branch, string projectDir)
+        {
+            // Mimic bash script's `env -i ... git clone` for cleaner environment
+            var gitCloneEnv = new Dictionary<string, string?>
+                {
+                    { "HOME", Path.GetTempPath() }, // Use system temp path
+                    { "GIT_ASKPASS", "" },
+                    { "GIT_TERMINAL_PROMPT", "0" },
+                    { "GITHUB_TOKEN", null },        // Unset sensitive token
+                    { "GIT_SSH_COMMAND", null }      // Unset custom SSH command
+                    // PATH is automatically inherited and not explicitly added here, relying on default behavior of ProcessStartInfo
+                };
+            string _b = !string.IsNullOrEmpty(branch) ? $"-b \"{branch}\"" : "";
+
+            var (gitCloneExitCode, gitCloneOut, gitCloneErr) = await CommandExecutor.RunCommandAsync("git", $"clone {_b} \"{githubUrl}\" \"{projectDir}\"", Environment.CurrentDirectory, environmentVariables: gitCloneEnv);
+            if (gitCloneExitCode != 0)
+            {
+                Logger.LogError($"Failed to clone repository '{githubUrl}': {gitCloneErr}. Check network access and URL.", 1);
+            }
+            Logger.LogInfo($"Repository '{repoName}' cloned successfully.");
+        }
+
+        private static async Task InstallDependencies(string repoName, string projectDir, string requirementsFile, string venvBinDir)
+        {
             if (File.Exists(requirementsFile))
             {
                 Logger.LogInfo($"Installing dependencies for '{repoName}' from '{requirementsFile}'...");
@@ -353,204 +466,21 @@ namespace GitRepoPy
                 }
                 Logger.LogInfo($"Dependencies for '{repoName}' installed.");
             }
+            else if (File.Exists(GetBuildFile(projectDir))){
+
+            }
             else
             {
                 Logger.LogWarn($"Neither 'build.sh' nor 'requirements.txt' found for '{repoName}'. Skipping dependency/build step.");
             }
-
-            // --- Start of run script handling logic ---
-            // On Windows, we'll create a .cmd wrapper.
-            // On Unix-like, we'll create a single executable .sh script.
-
-            Logger.LogInfo($"Ensuring target bin directory '{GlobalConfig.TOOLS_BIN_DIR}' exists...");
-            try
-            {
-                Directory.CreateDirectory(GlobalConfig.TOOLS_BIN_DIR);
-                Logger.LogInfo($"Target bin directory '{GlobalConfig.TOOLS_BIN_DIR}' created or already exists.");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Failed to create target bin directory '{GlobalConfig.TOOLS_BIN_DIR}': {ex.Message}. Please check permissions.", 1);
-            }
-
-            string localProjectRunScriptPath = Path.Combine(projectDir, "run.sh");
-            string localProjectMainPyPath = Path.Combine(projectDir, "main.py");
-
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                var targetCmdWrapperPath = Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".cmd");
-
-                // Clean up any conflicting files/symlinks first
-                if (File.Exists(targetCmdWrapperPath)) File.Delete(targetCmdWrapperPath);
-                // Also clean up old .sh files or non-extension links from previous versions
-                if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".sh"))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".sh"));
-                if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName));
-                if (File.Exists(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".exe"))) File.Delete(Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName + ".exe"));
-                StringBuilder cmdWrapperContent = CreateCmdScriptContent(projectDir);
-
-                try
-                {
-                    await File.WriteAllTextAsync(targetCmdWrapperPath, cmdWrapperContent.ToString());
-                    Logger.LogInfo($"CMD wrapper script created at '{targetCmdWrapperPath}'.");
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError($"Failed to create CMD wrapper script at '{targetCmdWrapperPath}': {ex.Message}. Please check permissions.", 1);
-                }
-                Logger.LogInfo($"Wrapper script for '{repoName}' created successfully at '{targetCmdWrapperPath}'.");
-            }
-            else // Linux/macOS (unchanged)
-            {
-                var targetBinExecutable = Path.Combine(GlobalConfig.TOOLS_BIN_DIR, repoName); // No extension for Unix-like
-                // Clean up any conflicting files/symlinks first
-                if (File.Exists(targetBinExecutable)) File.Delete(targetBinExecutable);
-                if (File.Exists(targetBinExecutable + ".sh")) File.Delete(targetBinExecutable + ".sh"); // Clean up old .sh if it somehow exists
-
-                if (File.Exists(localProjectRunScriptPath) && !forceCreateRunMode)
-                {
-                    // Scenario 1 (Unix-like): project_dir/run.sh found AND --force-create-run is NOT active
-                    Logger.LogInfo($"'run.sh' found in project directory ('{localProjectRunScriptPath}'). Making it executable and creating a symbolic link.");
-                    FileSystemHelper.SetExecutablePermissions(localProjectRunScriptPath);
-
-                    FileSystemHelper.CreateSymlink(localProjectRunScriptPath, targetBinExecutable);
-                }
-                else
-                {
-                    // Scenario 2 (Unix-like): project_dir/run.sh NOT found OR --force-create-run IS active
-                    if (forceCreateRunMode)
-                    {
-                        Logger.LogInfo($"Force-creating default Python wrapper script at '{targetBinExecutable}' (ignoring existing project 'run.sh' if any).");
-                    }
-                    else
-                    {
-                        Logger.LogWarn($"No 'run.sh' found in project directory ('{localProjectRunScriptPath}'). Generating default Python wrapper script directly at '{targetBinExecutable}'.");
-                    }
-
-                    StringBuilder shScriptContent = CreateShScriptContent(projectDir, localProjectMainPyPath);
-
-                    try
-                    {
-                        await File.WriteAllTextAsync(targetBinExecutable, shScriptContent.ToString());
-                        Logger.LogInfo($"Wrapper script created at '{targetBinExecutable}'.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError($"Failed to create wrapper script at '{targetBinExecutable}': {ex.Message}. Please check permissions.", 1);
-                    }
-
-                    FileSystemHelper.SetExecutablePermissions(targetBinExecutable); // Make the file executable
-                }
-                Logger.LogInfo($"Wrapper script for '{repoName}' created successfully at '{targetBinExecutable}'.");
-            }
-            // --- End of run script handling logic ---
-
-            // After successful setup and run script creation, add to PATH
-            PathEnvironmentManager.AddToolsBinToSystemPath();
-
-            Logger.LogInfo($"Project setup for '{repoName}' completed successfully!");
         }
 
-        private static StringBuilder CreateCmdScriptContent(string projectDir)
+        private static string? GetBuildFile(string projectDir)
         {
-            // Generate the CMD wrapper content
-            var cmdWrapperContent = new StringBuilder();
-            cmdWrapperContent.AppendLine("@echo off");
-            cmdWrapperContent.AppendLine($"rem This script was automatically generated by GitRepoPy (Version: {GlobalConfig.SCRIPT_VERSION}).");
-            cmdWrapperContent.AppendLine($"rem It runs the Python application within its virtual environment.");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine($"set \"PROJECT_ROOT={projectDir}\"");
-            cmdWrapperContent.AppendLine($"set \"VENV_DIR=%PROJECT_ROOT%\\.venv\"");
-            cmdWrapperContent.AppendLine($"set \"VENV_ACTIVATE_BAT=%VENV_DIR%\\Scripts\\activate.bat\"");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("if not exist \"%PROJECT_ROOT%\" (");
-            cmdWrapperContent.AppendLine("    echo ERROR: Project directory '%PROJECT_ROOT%' not found or accessible.");
-            cmdWrapperContent.AppendLine("    exit /b 1");
-            cmdWrapperContent.AppendLine(")");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("if not exist \"%VENV_ACTIVATE_BAT%\" (");
-            cmdWrapperContent.AppendLine("    echo ERROR: Virtual environment activation script not found at '%VENV_ACTIVATE_BAT%'.");
-            cmdWrapperContent.AppendLine("    echo Please ensure the virtual environment is correctly set up in '%VENV_DIR%'.");
-            cmdWrapperContent.AppendLine("    exit /b 1");
-            cmdWrapperContent.AppendLine(")");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("rem Activate the virtual environment");
-            cmdWrapperContent.AppendLine("call \"%VENV_ACTIVATE_BAT%\"");
-            cmdWrapperContent.AppendLine("if %errorlevel% neq 0 (");
-            cmdWrapperContent.AppendLine("    echo ERROR: Failed to activate virtual environment at '%VENV_ACTIVATE_BAT%'.");
-            cmdWrapperContent.AppendLine("    exit /b 1");
-            cmdWrapperContent.AppendLine(")");
-            cmdWrapperContent.AppendLine("");
-
-            // Check if main.py exists and execute it
-            cmdWrapperContent.AppendLine($"set \"MAIN_PYTHON_SCRIPT=%PROJECT_ROOT%\\main.py\"");
-            cmdWrapperContent.AppendLine("if not exist \"%MAIN_PYTHON_SCRIPT%\" (");
-            cmdWrapperContent.AppendLine("    echo ERROR: Main Python script '%MAIN_PYTHON_SCRIPT%' not found in project directory.");
-            cmdWrapperContent.AppendLine("    echo Please ensure 'main.py' exists in '%PROJECT_ROOT%' or adjust the generated script.");
-            cmdWrapperContent.AppendLine("    exit /b 1");
-            cmdWrapperContent.AppendLine(")");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("rem Execute the main Python script with all passed arguments");
-            cmdWrapperContent.AppendLine("python \"%MAIN_PYTHON_SCRIPT%\" %*"); // %* passes all arguments
-            cmdWrapperContent.AppendLine("set \"RUN_STATUS=%errorlevel%\"");
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("rem Deactivate the virtual environment (optional, as the batch file's env is local)");
-            cmdWrapperContent.AppendLine("rem if defined VIRTUAL_ENV (call deactivate)"); // VIRTUAL_ENV is set by activate.bat
-            cmdWrapperContent.AppendLine("");
-            cmdWrapperContent.AppendLine("exit /b %RUN_STATUS%");
-            return cmdWrapperContent;
+            string filename = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "build.ps1" : "";
+            return Path.Combine(projectDir, "build", filename);
         }
 
-        private static StringBuilder CreateShScriptContent(string projectDir, string localProjectMainPyPath)
-        {
-            // Generate the Bash script content directly into the targetBinExecutable file (no .sh extension)
-            var shScriptContent = new StringBuilder();
-            shScriptContent.AppendLine("#!/bin/bash");
-            shScriptContent.AppendLine($"# This script was automatically generated by GitRepoPy (Version: {GlobalConfig.SCRIPT_VERSION}).");
-            shScriptContent.AppendLine("# It acts as a wrapper to run the main Python application within its virtual environment.");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine($"PROJECT_ROOT=\"{projectDir}\"");
-            shScriptContent.AppendLine($"VENV_DIR=\"${{PROJECT_ROOT}}/.venv\"");
-            shScriptContent.AppendLine($"MAIN_PYTHON_SCRIPT=\"{localProjectMainPyPath}\"");
-            shScriptContent.AppendLine($"ACTIVATE_SCRIPT=\"${{VENV_DIR}}/bin/activate\""); // Unix-like venv path
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("# Basic checks");
-            shScriptContent.AppendLine("if [ ! -d \"$PROJECT_ROOT\" ]; then");
-            shScriptContent.AppendLine("    echo \"ERROR: Project directory '$PROJECT_ROOT' not found or accessible.\" >&2");
-            shScriptContent.AppendLine("    exit 1");
-            shScriptContent.AppendLine("fi");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("if [ ! -f \"$MAIN_PYTHON_SCRIPT\" ]; then");
-            shScriptContent.AppendLine("    echo \"ERROR: Main Python script '$MAIN_PYTHON_SCRIPT' not found in project directory.\" >&2");
-            shScriptContent.AppendLine("    echo \"Please ensure 'main.py' exists in '$PROJECT_ROOT' or adjust the generated script.\" >&2");
-            shScriptContent.AppendLine("    exit 1");
-            shScriptContent.AppendLine("fi");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("if [ ! -f \"$ACTIVATE_SCRIPT\" ]; then");
-            shScriptContent.AppendLine("    echo \"ERROR: Virtual environment activation script not found at '$ACTIVATE_SCRIPT'.\" >&2");
-            shScriptContent.AppendLine("    echo \"Please ensure the virtual environment is correctly set up in '$VENV_DIR'.\" >&2");
-            shScriptContent.AppendLine("    exit 1");
-            shScriptContent.AppendLine("fi");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("# Activate the virtual environment");
-            shScriptContent.AppendLine("source \"$ACTIVATE_SCRIPT\"");
-            shScriptContent.AppendLine("if [ $? -ne 0 ]; then");
-            shScriptContent.AppendLine("    echo \"ERROR: Failed to activate virtual environment at '$ACTIVATE_SCRIPT'.\" >&2");
-            shScriptContent.AppendLine("    exit 1");
-            shScriptContent.AppendLine("fi");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("# Execute the main Python script with all passed arguments");
-            shScriptContent.AppendLine("python \"$MAIN_PYTHON_SCRIPT\" \"$@\"");
-            shScriptContent.AppendLine("RUN_STATUS=$?");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("# Deactivate the virtual environment if the function exists");
-            shScriptContent.AppendLine("if declare -f deactivate &>/dev/null; then");
-            shScriptContent.AppendLine("    deactivate");
-            shScriptContent.AppendLine("fi");
-            shScriptContent.AppendLine("");
-            shScriptContent.AppendLine("exit $RUN_STATUS");
-            return shScriptContent;
-        }
 
         public static void ListProjects()
         {
@@ -587,7 +517,7 @@ namespace GitRepoPy
             }
             else
             {
-                Logger.LogInfo($"Total projects found: {projectCount}", GlobalConfig.INFO_COLOR);
+                Logger.LogInfo($"Total projects found: {projectCount}", GlobalConfig.GREEN);
                 Logger.LogInfo(lineSpacer, GlobalConfig.CYAN);
             }
             Environment.Exit(0);

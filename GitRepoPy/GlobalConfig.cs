@@ -1,5 +1,4 @@
-using System;
-using System.IO;
+
 using System.Runtime.InteropServices;
 
 namespace GitRepoPy
@@ -26,7 +25,7 @@ namespace GitRepoPy
             (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Tools", "Bin") : "/usr/local/bin");
 
         // ANSI escape codes for console colors
-        public const string INFO_COLOR = "\x1b[32m";  // Green
+        public const string GREEN = "\x1b[32m";  // Green
         public const string WARN_COLOR = "\x1b[33m";  // Yellow
         public const string ERROR_COLOR = "\x1b[31m"; // Red
         public const string MAGENTA = "\x1b[35m"; // Purple

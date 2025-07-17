@@ -1,7 +1,3 @@
-using System;
-using System.Linq;
-using GitRepoPy; // For Logger and GlobalConfig
-
 namespace GitRepoPy
 {
     /// <summary>
@@ -159,7 +155,7 @@ namespace GitRepoPy
             // as this method is purely for displaying CLI usage.
             var appName = AppDomain.CurrentDomain.FriendlyName; // Get executable name
 
-            Console.WriteLine($"{GlobalConfig.INFO_COLOR}Usage: {appName} [OPTIONS] <repository_name> [github_url]{GlobalConfig.RESET_COLOR}");
+            Console.WriteLine($"{GlobalConfig.GREEN}Usage: {appName} [OPTIONS] <repository_name> [github_url]{GlobalConfig.RESET_COLOR}");
             Console.WriteLine("\nThis script automates the setup, removal, and updating of Python projects from Git repositories.");
             Console.WriteLine($"\n{GlobalConfig.WARN_COLOR}Options:{GlobalConfig.RESET_COLOR}");
             Console.WriteLine($"  -r, --remove <repository_name>          : Deletes the symbolic link and the entire project directory.");
@@ -176,11 +172,11 @@ namespace GitRepoPy
             Console.WriteLine($"                                            from remote, and pops stashed changes.");
             Console.WriteLine($"                                            Example: {appName} --update my-web-app");
             Console.WriteLine($"\n  -h, --help                            : Displays this help message and exits.");
-            Console.WriteLine($"\n{GlobalConfig.INFO_COLOR}Default Setup Mode (no specific option):{GlobalConfig.RESET_COLOR}");
+            Console.WriteLine($"\n{GlobalConfig.GREEN}Default Setup Mode (no specific option):{GlobalConfig.RESET_COLOR}");
             // Corrected line for proper alignment
             Console.WriteLine($"  {appName} <repository_name> <github_url>");
             Console.WriteLine($"  Example: {appName} my-web-app https://github.com/myuser/my-web-app.git");
-            Console.WriteLine($"\n{GlobalConfig.INFO_COLOR}Version:{GlobalConfig.RESET_COLOR} {GlobalConfig.SCRIPT_VERSION}");
+            Console.WriteLine($"\n{GlobalConfig.GREEN}Version:{GlobalConfig.RESET_COLOR} {GlobalConfig.SCRIPT_VERSION}");
             Environment.Exit(0);
         }
     }

@@ -1,5 +1,3 @@
-using System;
-using GitRepoPy; // For GlobalConfig
 
 namespace GitRepoPy
 {
