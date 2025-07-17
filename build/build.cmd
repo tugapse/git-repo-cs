@@ -2,6 +2,8 @@
 REM This script builds the .NET application for Windows and Linux,
 REM and generates platform-specific run scripts (run.cmd and run.sh).
 
+set "SCRIPT_DIR=%~dp0"
+
 REM --- Define Colors for Output ---
 REM Using PowerShell for colored output in CMD
 set "GREEN=powershell -NoProfile -Command "Write-Host -ForegroundColor Green" "
@@ -18,12 +20,27 @@ set "RELEASE_ARTIFACT_NAME=git-repo-cs"
 
 set "RELEASE_DIR=.\publish\releases" REM Define the release output directory
 
-REM --- Check for dotnet CLI ---
+REM Path to the dotnet-install PowerShell script
+set "DOTNET_INSTALL_SCRIPT=%SCRIPT_DIR%dotnet-install.ps1"
+
+REM --- Check and Install dotnet CLI ---
+:check_dotnet
 %YELLOW% --- Checking for dotnet CLI ---
 where.exe dotnet >nul 2>&1
 if %errorlevel% neq 0 (
-    %RED% Error: 'dotnet' command not found. Please install the .NET SDK. Exiting.
-    exit /b 1
+    %RED% Error: 'dotnet' command not found.
+    if exist "%DOTNET_INSTALL_SCRIPT%" (
+        %YELLOW% Attempting to run dotnet-install.ps1...
+        powershell -NoProfile -File "%DOTNET_INSTALL_SCRIPT%"
+        if %errorlevel% neq 0 (
+            %RED% Error: dotnet-install.ps1 failed. Please install .NET SDK manually. Exiting.
+            exit /b 1
+        )
+        goto check_dotnet REM Re-check dotnet after install attempt
+    ) else (
+        %RED% Error: dotnet-install.ps1 not found at "%DOTNET_INSTALL_SCRIPT%". Please install .NET SDK manually. Exiting.
+        exit /b 1
+    )
 ) else (
     %GREEN% dotnet CLI found.
 )
@@ -89,7 +106,7 @@ echo # This script runs the Linux x64 version of the application.
 echo # Navigate to the published application directory
 echo cd ./publish/linux-x64 ^|^| { echo "Error: Linux publish directory not found."; exit 1; }
 echo # Execute the application
-echo ./%PROJECT_EXECUTABLE_NAME%
+echo .\!PROJECT_EXECUTABLE_NAME!.exe "%*"
 ) > run.sh
 REM chmod +x run.sh is not applicable in a .cmd script, but the content of run.sh is correct.
 %GREEN% Created: run.sh

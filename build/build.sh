@@ -12,37 +12,43 @@ NC='\033[0m' # No Color
 PROJECT_EXECUTABLE_NAME="git-repo"
 # IMPORTANT: Set this to the base name you want for your zip file artifacts (e.g., 'git-repo-cs')
 RELEASE_ARTIFACT_NAME="git-repo-cs"
-
+# IMPORTANT: Adjust this path to your file containing public const string SCRIPT_VERSION
+VERSION_FILE="./GitRepoPy/GlobalConfig.cs"
 RELEASE_DIR="./publish/releases" # Define the release output directory
 
-# --- Check for dotnet CLI ---
-echo -e "${YELLOW}--- Checking for dotnet CLI ---${NC}"
-if ! command -v dotnet &> /dev/null
-then
-    echo -e "${RED}Error: 'dotnet' command not found. Please install the .NET SDK. Exiting.${NC}"
-    exit 1
-else
-    echo -e "${GREEN}dotnet CLI found.${NC}"
-fi
+# Get the directory where the current script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-# --- Create Release Directory (if zipping is enabled) ---
-if [ "$ZIP_AVAILABLE" = true ]; then
-    echo -e "${YELLOW}--- Ensuring release directory exists: ${RELEASE_DIR} ---${NC}"
-    mkdir -p "$RELEASE_DIR"
-    if [ ! -d "$RELEASE_DIR" ]; then
-        echo -e "${RED}Error: Failed to create directory ${RELEASE_DIR}. Check permissions for $(pwd) or disk space. Zipping disabled.${NC}"
-        ZIP_AVAILABLE=false
-    fi
-fi
+# Path to the dotnet-install script
+DOTNET_INSTALL_SCRIPT="${SCRIPT_DIR}/dotnet-install.sh"
 
-# Get the absolute path for the release directory for robust zipping
-if [ "$ZIP_AVAILABLE" = true ]; then
-    ABS_RELEASE_DIR=$(realpath "$RELEASE_DIR")
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to resolve absolute path for ${RELEASE_DIR}. Zipping disabled. Exiting.${NC}"
-        ZIP_AVAILABLE=false # Disable zipping if realpath fails
+# --- Function to check and install dotnet ---
+check_and_install_dotnet() {
+    echo -e "${YELLOW}--- Checking for dotnet CLI ---${NC}"
+    if ! command -v dotnet &> /dev/null; then
+        echo -e "${RED}Error: 'dotnet' command not found.${NC}"
+        if [ -f "${DOTNET_INSTALL_SCRIPT}" ]; then
+            echo -e "${YELLOW}Attempting to run dotnet-install.sh...${NC}"
+            # Execute the install script
+            bash "${DOTNET_INSTALL_SCRIPT}"
+            # After trying to install, check again
+            if ! command -v dotnet &> /dev/null; then
+                echo -e "${RED}Error: 'dotnet' command still not found after attempting install. Please install it manually. Exiting.${NC}"
+                exit 1
+            else
+                echo -e "${GREEN}dotnet CLI found after install attempt.${NC}"
+            fi
+        else
+            echo -e "${RED}Error: dotnet-install.sh not found at ${DOTNET_INSTALL_SCRIPT}. Please install .NET SDK manually. Exiting.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}dotnet CLI found.${NC}"
     fi
-fi
+}
+
+# Call the function at the beginning
+check_and_install_dotnet
 
 # --- Build and Publish for Windows ---
 echo -e "${GREEN}--- Publishing for Windows (win-x64) ---${NC}"
@@ -81,7 +87,7 @@ cat <<EOF > run.sh
 # Navigate to the published application directory
 cd ./publish/linux-x64 || { echo "Error: Linux publish directory not found."; exit 1; }
 # Execute the application
-./${PROJECT_EXECUTABLE_NAME}
+./${PROJECT_EXECUTABLE_NAME} "\$@"
 EOF
 chmod +x run.sh # Make the script executable
 echo -e "${GREEN}Created: run.sh${NC}"
