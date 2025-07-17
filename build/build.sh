@@ -50,26 +50,6 @@ check_and_install_dotnet() {
 # Call the function at the beginning
 check_and_install_dotnet
 
-# --- Build and Publish for Windows ---
-echo -e "${GREEN}--- Publishing for Windows (win-x64) ---${NC}"
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishDir=./publish/win-x64
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: dotnet publish for Windows failed. Exiting.${NC}"
-    exit 1
-fi
-
-# --- Generate run.cmd for Windows ---
-echo -e "${YELLOW}--- Generating run.cmd for Windows ---${NC}"
-cat <<EOF > run.cmd
-@echo off
-REM This script runs the Windows x64 version of the application.
-REM Navigate to the published application directory
-cd .\publish\win-x64 || (echo Error: Windows publish directory not found. & exit /b 1)
-REM Execute the application
-.\%PROJECT_EXECUTABLE_NAME%.exe
-EOF
-echo -e "${GREEN}Created: run.cmd${NC}"
-
 
 # --- Build and Publish for Linux ---
 echo -e "${GREEN}--- Publishing for Linux (linux-x64) ---${NC}"
