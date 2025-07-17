@@ -492,15 +492,15 @@ namespace GitRepoPy
             Logger.LogInfo(lineSpacer);
 
 
-            foreach (string filename in Directory.GetFiles(GlobalConfig.TOOLS_BIN_DIR))
+            foreach (string projetcRoot in Directory.GetDirectories(GlobalConfig.TOOLS_BASE_DIR))
             {
-                string projetcRoot = GetProjectRootFromFile(filename);
+                
                 if (string.IsNullOrEmpty(projetcRoot) || !Directory.Exists(Path.Combine(projetcRoot, ".git")))
                 {
-                    Logger.LogWarn($"Not found {filename}");
+                    Logger.LogWarn($"Not found {projetcRoot}");
                     continue;
                 }
-                string? projectName = Path.GetDirectoryName(projetcRoot);
+                string? projectName = projetcRoot.Split(Path.DirectorySeparatorChar).Last();
                 string venvStatus = Directory.Exists(Path.Combine(projetcRoot, ".venv")) ? "OK" : "N/A";
                 DateTime createdAt = Directory.GetCreationTimeUtc(projetcRoot);
                 Logger.LogInfo($"# {projectName}", GlobalConfig.BLUE);

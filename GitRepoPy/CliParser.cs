@@ -44,7 +44,7 @@ namespace GitRepoPy
 
             if (args.Length == 0)
             {
-                Logger.LogError("No arguments provided. Use --help for usage.", 1);
+                // Logger.LogError("No arguments provided. Use --help for usage.", 1);
                 return parsed;
             }
 
